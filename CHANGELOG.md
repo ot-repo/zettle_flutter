@@ -1,3 +1,7 @@
+## 0.2.8
+
+* Add support for specifying refund amount
+
 ## 0.2.7
 
 * Introduce session management with login/logout functionalities
