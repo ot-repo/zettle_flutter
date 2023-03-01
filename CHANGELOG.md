@@ -1,3 +1,7 @@
+## 0.2.9
+
+* Fix crash resulted from operating on null refund amount
+
 ## 0.2.8
 
 * Add support for specifying refund amount
