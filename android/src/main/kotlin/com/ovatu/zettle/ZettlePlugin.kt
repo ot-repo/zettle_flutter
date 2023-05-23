@@ -313,6 +313,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
                       "status" to "failed",
               )
             }
+            else -> {}
           }
 
           currentOp.flutterResult()
@@ -345,6 +346,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
                       "status" to "failed",
               )
             }
+            else -> {}
           }
 
 
