@@ -1,3 +1,7 @@
+## 0.2.10
+
+* Support flutter SDK version 3.10.1
+
 ## 0.2.9
 
 * Fix crash resulted from operating on null refund amount
