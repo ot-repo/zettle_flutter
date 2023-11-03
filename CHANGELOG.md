@@ -1,5 +1,9 @@
 ## 0.2.10
 
+* Bump zettle SDK version 2.6.5
+
+## 0.2.10
+
 * Support flutter SDK version 3.10.1
 
 ## 0.2.9
