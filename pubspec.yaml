@@ -5,7 +5,7 @@ repository: https://github.com/ovatu/zettle_flutter
 homepage: https://ovatu.com/us
 
 environment:
-  sdk: ">=2.16.0 <3.0.0"
+  sdk: '>=3.1.1 <4.0.0'
 
 dependencies:
   flutter:
