@@ -3,6 +3,7 @@ description: A wrapper for the Zettle POS SDK for Android and iOS. Includes supp
 version: 0.2.10
 repository: https://github.com/ovatu/zettle_flutter
 homepage: https://ovatu.com/us
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
 environment:
   sdk: '>=3.1.1 <4.0.0'
