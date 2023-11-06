@@ -53,6 +53,8 @@ android {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation "com.izettle.payments:android-sdk-ui:$zettle_version"
+    // Core always needed
+    implementation "com.zettle.sdk:core:$zettle_version"
+    // For Card Reader Payments
+    implementation "com.zettle.sdk.feature.cardreader:ui:$zettle_version"
 }
