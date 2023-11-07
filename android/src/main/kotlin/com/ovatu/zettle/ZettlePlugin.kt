@@ -6,24 +6,26 @@ import android.util.Log
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.lifecycle.Observer
-import com.izettle.android.commons.state.StateObserver
-import com.izettle.payments.android.payment.TransactionReference
-import com.izettle.payments.android.payment.refunds.RefundFailureReason
-import com.izettle.payments.android.payment.refunds.RetrieveCardPaymentFailureReason
-import com.izettle.payments.android.sdk.IZettleSDK
-import com.izettle.payments.android.sdk.User
-import com.izettle.payments.android.ui.payment.CardPaymentActivity
-import com.izettle.payments.android.ui.payment.CardPaymentResult
-import com.izettle.payments.android.ui.payment.FailureReason
-import com.izettle.payments.android.ui.readers.CardReadersActivity
-import com.izettle.payments.android.ui.refunds.RefundResult
-import com.izettle.payments.android.ui.refunds.RefundsActivity
-import com.izettle.payments.android.payment.refunds.CardPaymentPayload
-import com.izettle.payments.android.payment.refunds.RefundsManager
-import com.izettle.payments.android.sdk.IZettleSDK.Instance.refundsManager
-import com.izettle.payments.android.sdk.User.AuthState.LoggedIn
-import com.izettle.android.commons.ext.state.toLiveData
-
+import com.zettle.sdk.commons.state.StateObserver
+import com.zettle.sdk.config
+import com.zettle.sdk.commons.ext.state.toLiveData
+import com.zettle.sdk.core.auth.User
+import com.zettle.sdk.feature.cardreader.payment.TippingStyle
+import com.zettle.sdk.feature.cardreader.payment.TransactionReference
+import com.zettle.sdk.feature.cardreader.payment.refunds.RefundFailureReason
+import com.zettle.sdk.feature.cardreader.payment.refunds.RetrieveCardPaymentFailureReason
+import com.zettle.sdk.feature.cardreader.ui.payment.CardPaymentActivity
+import com.zettle.sdk.feature.cardreader.ui.payment.CardPaymentResult
+import com.zettle.sdk.feature.cardreader.ui.CardReaderAction
+import com.zettle.sdk.feature.cardreader.ui.refunds.RefundResult
+import com.zettle.sdk.feature.cardreader.ui.CardReaderFeature
+import com.zettle.sdk.feature.cardreader.payment.refunds.CardPaymentPayload
+import com.zettle.sdk.features.refund
+import com.zettle.sdk.features.charge
+import com.zettle.sdk.features.show
+import com.zettle.sdk.ui.ZettleResult
+import com.zettle.sdk.ui.zettleResult
+import com.zettle.sdk.ZettleSDK
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -50,6 +52,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
   private var operations: MutableMap<String, ZettlePluginResponseWrapper> = mutableMapOf()
   private var currentOperation: ZettlePluginResponseWrapper? = null
+  private var sdk: ZettleSDK? = null
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     Log.d(tag, "onAttachedToEngine")
@@ -79,7 +82,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
   override fun onDetachedFromActivity() {
     Log.d(tag, "onDetachedFromActivity")
     if (sdkStarted) {
-      IZettleSDK.stop()
+      sdk?.stop()
     }
   }
 
@@ -132,10 +135,17 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
       val clientID = args["androidClientId"] as String
       val redirect = args["redirect"] as String
 
-      IZettleSDK.init(activity, clientID, redirect)
-      IZettleSDK.start()
-      IZettleSDK.user.state.toLiveData().observe(activity, authObserver)
+      val config = config(activity) {
+        isDevMode = true
+        auth {
+          this.clientId = clientID
+          this.redirectUrl = redirect
+        }
+        addFeature(CardReaderFeature.Configuration)
+      }
 
+      sdk = ZettleSDK.configure(config)
+      sdk?.start()
       sdkStarted = true
 
       currentOp.response.message = mutableMapOf("initialized" to true)
@@ -149,12 +159,12 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
   private fun login() {
     Log.d(tag, "login")
-    IZettleSDK.user.login(activity)
+    ZettleSDK.instance?.login(activity)
   }
 
   private fun logout() {
     Log.d(tag, "logout")
-    IZettleSDK.user.logout()
+    ZettleSDK.instance?.logout()
   }
 
   private fun loginChange() {
@@ -193,15 +203,8 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
     val internalUniqueTraceId = args["reference"] as String
     val reference = TransactionReference.Builder(internalUniqueTraceId).build()
-
-    val intent = CardPaymentActivity.IntentBuilder(activity)
-            .amount((((args["amount"] as Double) * 100).toInt()).toLong())
-            .reference(reference)
-            .enableLogin(args["enableLogin"] as Boolean? ?: true)
-            .enableTipping(args["enableTipping"] as Boolean? ?: true)
-            .enableInstalments(args["enableInstalments"] as Boolean? ?: false)
-            .build()
-
+    val action = CardReaderAction.Payment(reference, (((args["amount"] as Double) * 100).toInt()).toLong(), TippingStyle.None)
+    val intent = action.charge(activity)
     startActivityForResult(activity, intent, ZettleTask.REQUEST_PAYMENT.code, null)
   }
 
@@ -210,164 +213,145 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
     val internalUniqueTraceId = args["reference"] as String
     var refundAmount = (args["refundAmount"] as Double?)
-    var amount = if (refundAmount != null) ((refundAmount * 100).toInt()).toLong() else null
-    refundsManager.retrieveCardPayment(internalUniqueTraceId, RefundCallback(amount, activity))
-  }
-
-  private inner class RefundCallback(val amount: Long?, activity: Activity) :
-          RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {
-
-    override fun onFailure(reason: RetrieveCardPaymentFailureReason) {
+    if (refundAmount == null) {
+      return
     }
-
-    override fun onSuccess(payload: CardPaymentPayload) {
-      val reference = TransactionReference.Builder(UUID.randomUUID().toString())
-              .build()
-
-      if (amount != null) {
-        val intent = RefundsActivity.IntentBuilder(activity)
-                .cardPayment(payload)
-                .refundAmount(amount)
-                .reference(reference)
-                .build()
-        startActivityForResult(activity, intent, ZettleTask.REQUEST_REFUND.code, null)
-      } else {
-        val intent = RefundsActivity.IntentBuilder(activity)
-                .cardPayment(payload)
-                .reference(reference)
-                .build()
-        startActivityForResult(activity, intent, ZettleTask.REQUEST_REFUND.code, null)
-      }
-    }
+    var amount = ((refundAmount!! * 100).toInt()).toLong()
+    val reference = TransactionReference.Builder(UUID.randomUUID().toString()).build()
+    val action = CardReaderAction.Refund(reference, amount, internalUniqueTraceId)
+    val intent = action.refund(activity)
+    startActivityForResult(activity, intent, ZettleTask.REQUEST_REFUND.code, null)
   }
 
   private fun showSettings(): ZettlePluginResponseWrapper {
     val currentOp = operations["showSettings"]!!
 
-    val intent = CardReadersActivity.newIntent(activity)
+    var action = CardReaderAction.Settings
+    val intent = action.show(activity)
     startActivityForResult(activity, intent, ZettleTask.SETTINGS.code, null)
 
     return currentOp
   }
 
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
-    Log.d(tag, "onActivityResult - RequestCode: $requestCode - Result Code: $resultCode")
+ override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+   if (resultCode != Activity.RESULT_OK) {
+     return false
+   }
 
-    Log.d(tag, "onActivityResult - operations: $operations")
+   Log.d(tag, "onActivityResult - RequestCode: $requestCode - Result Code: $resultCode")
 
-    val currentOp: ZettlePluginResponseWrapper? = when (ZettleTask.valueOf(requestCode)) {
-      ZettleTask.REQUEST_PAYMENT -> operations["requestPayment"]
-      ZettleTask.REQUEST_REFUND -> operations["requestRefund"]
-      else -> null
-    }
+   Log.d(tag, "onActivityResult - operations: $operations")
 
-    Log.d(tag, "onActivityResult - cuurent op: $currentOp")
+   val currentOp: ZettlePluginResponseWrapper? = when (ZettleTask.valueOf(requestCode)) {
+     ZettleTask.REQUEST_PAYMENT -> operations["requestPayment"]
+     ZettleTask.REQUEST_REFUND -> operations["requestRefund"]
+     else -> null
+   }
 
-    if (currentOp == null) {
-      return false
-    }
+   Log.d(tag, "onActivityResult - cuurent op: $currentOp")
 
-    if (data != null && data.extras != null) {
-      val result = resultCode == Activity.RESULT_OK
+   if (currentOp == null) {
+     return false
+   }
 
-      currentOp.response.status = result
+   if (data != null && data.extras != null) {
+     val result = resultCode == Activity.RESULT_OK
 
-      when (ZettleTask.valueOf(requestCode)) {
-        ZettleTask.REQUEST_PAYMENT -> {
+     currentOp.response.status = result
 
-          when (val paymentResult: CardPaymentResult? =
-                  data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)) {
-            is CardPaymentResult.Completed -> {
-              currentOp.response.status = true
-              currentOp.response.message = mutableMapOf(
-                      "status" to "completed",
-                      "amount" to paymentResult.payload.amount,
-                      "gratuityAmount" to paymentResult.payload.gratuityAmount,
-                      "cardType" to paymentResult.payload.cardType,
-                      "cardPaymentEntryMode" to paymentResult.payload.cardPaymentEntryMode,
-                      "cardholderVerificationMethod" to paymentResult.payload.cardholderVerificationMethod,
-                      "tsi" to paymentResult.payload.tsi,
-                      "tvr" to paymentResult.payload.tvr,
-                      "applicationIdentifier" to paymentResult.payload.applicationIdentifier,
-                      "cardIssuingBank" to paymentResult.payload.cardIssuingBank,
-                      "maskedPan" to paymentResult.payload.maskedPan,
-                      "panHash" to paymentResult.payload.panHash,
-                      "applicationName" to paymentResult.payload.applicationName,
-                      "authorizationCode" to paymentResult.payload.authorizationCode,
-                      "installmentAmount" to paymentResult.payload.installmentAmount,
-                      "nrOfInstallments" to paymentResult.payload.nrOfInstallments,
-                      "mxFiid" to paymentResult.payload.mxFiid,
-                      "mxCardType" to paymentResult.payload.mxCardType,
-                      "panHash" to paymentResult.payload.panHash,
-                      "reference" to paymentResult.payload.reference?.id,
-              )
-            }
-            is CardPaymentResult.Canceled -> {
-              currentOp.response.status = false
-              currentOp.response.message = mutableMapOf(
-                      "status" to "canceled"
-              )
-            }
-            is CardPaymentResult.Failed -> {
-              currentOp.response.message = mutableMapOf(
-                      "status" to "failed",
-              )
-            }
-            else -> {}
-          }
+     when (ZettleTask.valueOf(requestCode)) {
+       ZettleTask.REQUEST_PAYMENT -> {
 
-          currentOp.flutterResult()
-          operations.remove(currentOp.response.methodName)
-        }
-        ZettleTask.REQUEST_REFUND -> {
+         when (val result: ZettleResult? = data?.zettleResult()) {
+           is ZettleResult.Completed<*> -> {
+             val paymentResult: CardPaymentResult.Completed = CardReaderAction.fromPaymentResult(result)
+             currentOp.response.status = true
+             currentOp.response.message = mutableMapOf(
+                     "status" to "completed",
+                     "amount" to paymentResult.payload.amount,
+                     "gratuityAmount" to paymentResult.payload.gratuityAmount,
+                     "cardType" to paymentResult.payload.cardType,
+                     "cardPaymentEntryMode" to paymentResult.payload.cardPaymentEntryMode,
+                     "cardholderVerificationMethod" to paymentResult.payload.cardholderVerificationMethod,
+                     "tsi" to paymentResult.payload.tsi,
+                     "tvr" to paymentResult.payload.tvr,
+                     "applicationIdentifier" to paymentResult.payload.applicationIdentifier,
+                     "cardIssuingBank" to paymentResult.payload.cardIssuingBank,
+                     "maskedPan" to paymentResult.payload.maskedPan,
+                     "panHash" to paymentResult.payload.panHash,
+                     "applicationName" to paymentResult.payload.applicationName,
+                     "authorizationCode" to paymentResult.payload.authorizationCode,
+                     "installmentAmount" to paymentResult.payload.installmentAmount,
+                     "nrOfInstallments" to paymentResult.payload.nrOfInstallments,
+                     "mxFiid" to paymentResult.payload.mxFiid,
+                     "mxCardType" to paymentResult.payload.mxCardType,
+                     "panHash" to paymentResult.payload.panHash,
+                     "reference" to paymentResult.payload.reference?.id,
+             )
+           }
+           is ZettleResult.Cancelled -> {
+             currentOp.response.status = false
+             currentOp.response.message = mutableMapOf(
+                     "status" to "canceled"
+             )
+           }
+           is ZettleResult.Failed -> {
+             currentOp.response.message = mutableMapOf(
+                     "status" to "failed",
+             )
+           }
+           else -> {}
+         }
+         currentOp.flutterResult()
+         operations.remove(currentOp.response.methodName)
+       }
+       ZettleTask.REQUEST_REFUND -> {
 
-          when (val paymentResult: RefundResult? =
-                  data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)) {
-            is RefundResult.Completed -> {
-              currentOp.response.status = true
-              currentOp.response.message = mutableMapOf(
-                      "status" to "completed",
-                      "originalAmount" to paymentResult.payload.originalAmount,
-                      "refundedAmount" to paymentResult.payload.refundedAmount,
-                      "cardType" to paymentResult.payload.cardType,
-                      "maskedPan" to paymentResult.payload.maskedPan,
-                      "cardPaymentUUID" to paymentResult.payload.cardPaymentUUID,
-              )
-            }
-            is RefundResult.Canceled -> {
-              currentOp.response.status = false
-              currentOp.response.message = mutableMapOf(
-                      "status" to "canceled"
-              )
-            }
-            is RefundResult.Failed -> {
-              currentOp.response.status = false
-              currentOp.response.message = mutableMapOf(
-                      "status" to "failed",
-              )
-            }
-            else -> {}
-          }
-
-
-          currentOp.flutterResult()
-          operations.remove(currentOp.response.methodName)
-        }
-        else -> {
-          currentOp.response.message = mutableMapOf("errors" to "Intent Data and/or Extras are null or empty")
-          currentOp.response.status = false
-          currentOp.flutterResult()
-          operations.remove(currentOp.response.methodName)
-        }
-      }
-    } else {
-      currentOp.response.message = mutableMapOf("errors" to "Intent Data and/or Extras are null or empty")
-      currentOp.response.status = false
-      currentOp.flutterResult()
-      operations.remove(currentOp.response.methodName)
-    }
-    return currentOp.response.status
-  }
+         when (val result = data?.zettleResult()) {
+           is ZettleResult.Completed<*> -> {
+             currentOp.response.status = true
+             val refund : RefundResult.Completed = CardReaderAction.fromRefundResult(result)
+             currentOp.response.message = mutableMapOf(
+                     "status" to "completed",
+                     "originalAmount" to refund.payload.originalAmount,
+                     "refundedAmount" to refund.payload.refundedAmount,
+                     "cardType" to refund.payload.cardType,
+                     "maskedPan" to refund.payload.maskedPan,
+                     "cardPaymentUUID" to refund.payload.cardPaymentUUID,
+             )
+           }
+           is ZettleResult.Cancelled -> {
+             currentOp.response.status = false
+             currentOp.response.message = mutableMapOf(
+                     "status" to "canceled"
+             )
+           }
+           is ZettleResult.Failed -> {
+             currentOp.response.status = false
+             currentOp.response.message = mutableMapOf(
+                     "status" to "failed",
+             )
+           }
+           else -> {}
+         }
+         currentOp.flutterResult()
+         operations.remove(currentOp.response.methodName)
+       }
+       else -> {
+         currentOp.response.message = mutableMapOf("errors" to "Intent Data and/or Extras are null or empty")
+         currentOp.response.status = false
+         currentOp.flutterResult()
+         operations.remove(currentOp.response.methodName)
+       }
+     }
+   } else {
+     currentOp.response.message = mutableMapOf("errors" to "Intent Data and/or Extras are null or empty")
+     currentOp.response.status = false
+     currentOp.flutterResult()
+     operations.remove(currentOp.response.methodName)
+   }
+   return currentOp.response.status
+ }
 }
 
 
