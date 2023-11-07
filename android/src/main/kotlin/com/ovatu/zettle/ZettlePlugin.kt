@@ -52,7 +52,6 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
   private var operations: MutableMap<String, ZettlePluginResponseWrapper> = mutableMapOf()
   private var currentOperation: ZettlePluginResponseWrapper? = null
-  private var sdk: ZettleSDK? = null
 
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     Log.d(tag, "onAttachedToEngine")
@@ -82,7 +81,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
   override fun onDetachedFromActivity() {
     Log.d(tag, "onDetachedFromActivity")
     if (sdkStarted) {
-      sdk?.stop()
+      ZettleSDK.instance?.stop()
     }
   }
 
@@ -144,8 +143,9 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
         addFeature(CardReaderFeature.Configuration)
       }
 
-      sdk = ZettleSDK.configure(config)
-      sdk?.start()
+      val sdk = ZettleSDK.configure(config)
+      sdk.start()
+      ZettleSDK.instance?.authState?.observe(activity, authObserver)
       sdkStarted = true
 
       currentOp.response.message = mutableMapOf("initialized" to true)
