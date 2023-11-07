@@ -28,7 +28,10 @@ apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 33
-    namespace "com.ovatu.zettle"
+// Conditional for compatibility with AGP <4.2.
+    if (project.android.hasProperty("namespace")) {
+        namespace 'com.ovatu.zettle'
+    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
