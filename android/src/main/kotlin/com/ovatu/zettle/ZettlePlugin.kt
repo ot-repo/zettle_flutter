@@ -135,7 +135,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
       val redirect = args["redirect"] as String
 
       val config = config(activity) {
-        isDevMode = true
+        isDevMode = false
         auth {
           this.clientId = clientID
           this.redirectUrl = redirect
