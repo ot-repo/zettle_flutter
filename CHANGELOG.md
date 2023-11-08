@@ -1,4 +1,4 @@
-## 0.2.10
+## 0.2.11
 
 * Bump zettle SDK version 2.6.5
 
