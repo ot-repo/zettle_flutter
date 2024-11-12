@@ -1,20 +1,10 @@
-group 'com.ovatu.zettle'
-version '0.2.11'
-
-buildscript {
-    ext.kotlin_version = '1.8.22'
-    ext.zettle_version = '2.16.2'
-
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.1.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-    }
+plugins {
+    id "com.android.library"
+    id "kotlin-android"
 }
+
+group 'com.ovatu.zettle'
+version '0.2.12'
 
 rootProject.allprojects {
     repositories {
@@ -22,9 +12,6 @@ rootProject.allprojects {
         mavenCentral()
     }
 }
-
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion 33
@@ -57,7 +44,7 @@ android {
 
 dependencies {
     // Core always needed
-    implementation "com.zettle.sdk:core:$zettle_version"
+    implementation "com.zettle.sdk:core:2.24.2"
     // For Card Reader Payments
-    implementation "com.zettle.sdk.feature.cardreader:ui:$zettle_version"
+    implementation "com.zettle.sdk.feature.cardreader:ui:2.24.2"
 }
