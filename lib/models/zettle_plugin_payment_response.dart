@@ -39,8 +39,8 @@ class ZettlePluginPaymentResponse {
         status = ZettlePluginPaymentStatus.failed;
     }
 
-    amount = response['amount'];
-    gratuityAmount = response['gratuityAmount'];
+    amount = response['amount']?.toDouble();
+    gratuityAmount = response['gratuityAmount']?.toDouble();
     cardType = response['cardType'];
     cardPaymentEntryMode = response['cardPaymentEntryMode'];
     cardholderVerificationMethod = response['cardholderVerificationMethod'];
@@ -52,8 +52,8 @@ class ZettlePluginPaymentResponse {
     panHash = response['panHash'];
     applicationName = response['applicationName'];
     authorizationCode = response['authorizationCode'];
-    installmentAmount = response['installmentAmount'];
-    nrOfInstallments = response['nrOfInstallments'];
+    installmentAmount = response['installmentAmount']?.toString();
+    nrOfInstallments = response['nrOfInstallments']?.toString();
     mxFiid = response['mxFiid'];
     mxCardType = response['mxCardType'];
     reference = response['reference'];
