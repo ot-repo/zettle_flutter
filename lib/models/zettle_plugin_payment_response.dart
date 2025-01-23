@@ -52,8 +52,8 @@ class ZettlePluginPaymentResponse {
     panHash = response['panHash'];
     applicationName = response['applicationName'];
     authorizationCode = response['authorizationCode'];
-    installmentAmount = response['installmentAmount'];
-    nrOfInstallments = response['nrOfInstallments'];
+    installmentAmount = response['installmentAmount']?.toDouble();
+    nrOfInstallments = response['nrOfInstallments']?.toInt();
     mxFiid = response['mxFiid'];
     mxCardType = response['mxCardType'];
     reference = response['reference'];
@@ -73,7 +73,7 @@ class ZettlePluginPaymentResponse {
   late String? panHash;
   late String? applicationName;
   late String? authorizationCode;
-  late int? installmentAmount;
+  late double? installmentAmount;
   late int? nrOfInstallments;
   late String? mxFiid;
   late String? mxCardType;
