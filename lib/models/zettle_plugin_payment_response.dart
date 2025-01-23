@@ -52,8 +52,8 @@ class ZettlePluginPaymentResponse {
     panHash = response['panHash'];
     applicationName = response['applicationName'];
     authorizationCode = response['authorizationCode'];
-    installmentAmount = response['installmentAmount']?.toString();
-    nrOfInstallments = response['nrOfInstallments']?.toString();
+    installmentAmount = response['installmentAmount'];
+    nrOfInstallments = response['nrOfInstallments'];
     mxFiid = response['mxFiid'];
     mxCardType = response['mxCardType'];
     reference = response['reference'];
