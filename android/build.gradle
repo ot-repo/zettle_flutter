@@ -43,6 +43,14 @@ android {
 }
 
 dependencies {
+    // Android SDK dependencies
+    implementation 'androidx.annotation:annotation:1.5.0'
+    implementation 'androidx.core:core:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-common:2.5.1'
+    
+    // Flutter dependencies
+    compileOnly 'io.flutter:flutter_embedding_debug:1.0.0-3316dd8728419ad3534e3f6112aa6291f587078a'
+    
     // Core always needed
     implementation "com.zettle.sdk:core:2.24.2"
     // For Card Reader Payments

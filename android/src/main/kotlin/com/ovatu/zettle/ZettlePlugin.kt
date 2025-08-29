@@ -5,6 +5,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat.startActivityForResult
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import com.zettle.sdk.commons.state.StateObserver
 import com.zettle.sdk.config
@@ -26,7 +27,6 @@ import com.zettle.sdk.features.show
 import com.zettle.sdk.ui.ZettleResult
 import com.zettle.sdk.ui.zettleResult
 import com.zettle.sdk.ZettleSDK
-import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -46,7 +46,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
   /// This local reference serves to register the plugin with the Flutter Engine and unregister it
   /// when the Flutter Engine is detached from the Activity
   private lateinit var channel : MethodChannel
-  private lateinit var activity: FlutterActivity
+  private lateinit var activity: Activity
 
   private var sdkStarted: Boolean = false
 
@@ -66,7 +66,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     Log.d(tag, "onAttachedToActivity")
-    activity = binding.activity as FlutterActivity
+    activity = binding.activity
     binding.addActivityResultListener(this)
   }
 
@@ -145,7 +145,7 @@ class ZettlePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegis
 
       val sdk = ZettleSDK.configure(config)
       sdk.start()
-      ZettleSDK.instance?.authState?.observe(activity, authObserver)
+      ZettleSDK.instance?.authState?.observe(activity as LifecycleOwner, authObserver)
       sdkStarted = true
 
       currentOp.response.message = mutableMapOf("initialized" to true)
